@@ -1,6 +1,6 @@
 const express = require('express');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode-terminal');
+const qrcode = require('qrcode');
 
 const app = express();
 app.use(express.json({limit: '50mb'}));
