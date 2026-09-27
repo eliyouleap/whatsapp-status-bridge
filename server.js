@@ -1,37 +1,20 @@
 const express = require('express');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const QRCode = require('qrcode');
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const app = express();
-app.use(express.json({limit: '50mb'}));
-let sock;
-let lastQR = null;
 
-async function connectToWhatsApp() {
+async function start() {
   const { state, saveCreds } = await useMultiFileAuthState('auth');
-  sock = makeWASocket({ auth: state });
+  const sock = makeWASocket({ auth: state, printQRInTerminal: true, browser: ['Ubuntu','Chrome','22.04'] });
   sock.ev.on('creds.update', saveCreds);
-  sock.ev.on('connection.update', (update) => {
-    const { connection, qr } = update;
-    if(qr) lastQR = qr;
-    if(connection === 'open') console.log('WHATSAPP CONNECTED!');
-  });
+  
+  // תבקש קוד
+  if(!state.creds.registered) {
+    await new Promise(r => setTimeout(r, 5000));
+    const code = await sock.requestPairingCode('9725XXXXXXXX'); // <--- תשנה למספר שלך בלי 0 בהתחלה
+    console.log('YOUR PAIRING CODE IS: ' + code);
+  }
 }
-connectToWhatsApp();
+start();
 
-app.get('/', (req,res) => res.send('Bridge is Live. Go to /qr to link'));
-app.get('/qr', async (req,res) => {
-  if(!lastQR) return res.send('Wait 20 seconds and refresh. No QR yet.');
-  try {
-    const img = await QRCode.toDataURL(lastQR);
-    res.send(`<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column"><h2>Scan with WhatsApp</h2><img src="${img}" style="width:350px;border:10px solid black"><script>setTimeout(()=>location.reload(),15000)</script></body></html>`);
-  } catch(e){ res.send('Error '+e.message); }
-});
-
-app.post('/status', async (req,res) => {
-  try {
-    await sock.sendMessage('status@broadcast', { text: req.body.text || 'test' });
-    res.json({ok:true});
-  } catch(e){ res.status(500).json({error:e.message}); }
-});
-
+app.get('/', (req,res) => res.send('Check logs for pairing code'));
 app.listen(process.env.PORT || 10000);
